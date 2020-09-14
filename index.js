@@ -141,7 +141,7 @@ const main = async () => {
   if (process.env.SKIP) return printResults(pulls);
 
   let page = 0;
-  while (page < MAX_PAGE) {
+  while (page < MAX_PAGE && !process.env.SKIP_PRS_FETCHING) {
     console.log(`Querying page ${page}`);
     const prs = await query(PRS_URL(page));
     prs;

@@ -70,7 +70,7 @@ const query = (url) =>
         res.on("end", () => {
           try {
             const json = JSON.parse(body);
-            if (json.message.match(/API rate limit exceeded for user ID/))
+            if (json.message?.match(/API rate limit exceeded for user ID/))
               return reject(`API rate limit exceeded (${url})`);
             resolve(json);
           } catch (e) {

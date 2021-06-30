@@ -67,7 +67,16 @@ const query = (url) =>
         res.on("data", (data) => {
           body += data;
         });
-        res.on("end", () => resolve(JSON.parse(body)));
+        res.on("end", () => {
+          try {
+            const json = JSON.parse(body);
+            if (json.message.match(/API rate limit exceeded for user ID/))
+              return reject(`API rate limit exceeded (${url})`);
+            resolve(json);
+          } catch (e) {
+            reject(e);
+          }
+        });
       }
     );
   });
@@ -79,7 +88,7 @@ const chunk = (arr, size) =>
 
 const isApprovedBy = (handle, reviews) =>
   reviews.some(
-    ({ user, state }) => user.login === handle && state === "APPROVED"
+    ({ user, state }) => user && user.login === handle && state === "APPROVED" // deleted users show up as null
   );
 
 const isCommentedBy = (handle, comments) =>
@@ -143,9 +152,9 @@ const main = async () => {
   let page = 0;
   while (page < MAX_PAGE && !process.env.SKIP_PRS_FETCHING) {
     console.log(`Querying page ${page}`);
-    const prs = await query(PRS_URL(page));
-    prs;
+    let prs = null;
     try {
+      prs = await query(PRS_URL(page));
       pulls = prs
         .filter((pr) => !pulls[pr.number])
         .map(({ comments_url, number, closed_at, html_url }) => ({
@@ -158,7 +167,7 @@ const main = async () => {
       fs.writeFileSync(PRS_FILE, JSON.stringify(pulls, null, 2));
     } catch (e) {
       console.error(e);
-      console.error(prs);
+      console.error({ prs });
       page -= 1;
     }
     page += 1;

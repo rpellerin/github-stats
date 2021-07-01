@@ -43,7 +43,7 @@ if (!process.env.GITHUB_HANDLES) {
 let pulls = {};
 try {
   pulls = require(PRS_FILE);
-  console.log(`Loaded PRs from ${PRS_FILE}`);
+  console.log(`Loaded PRs from ${PRS_FILE} (${Object.keys(pulls).length})`);
 } catch (e) {
   // do nothing
 }
@@ -94,12 +94,18 @@ const isApprovedBy = (handle, reviews) =>
 const isCommentedBy = (handle, comments) =>
   comments.some(({ user, state }) => user.login === handle);
 
-const handlePr = async (pr) => {
-  if (GITHUB_HANDLES.every((handle) => pr[handle] !== undefined)) return pr;
+const handlePr = async (pr, index) => {
+  const alreadyFetched = GITHUB_HANDLES.every(
+    (handle) => pr[handle] !== undefined
+  );
+  if (alreadyFetched) {
+    process.stdout.write("#");
+    return pr;
+  }
   const { comments_url, number, closed_at, html_url } = pr;
   const reviews = await query(PR_REVIEWS_URL(number));
   const comments = await query(comments_url);
-
+  process.stdout.write("#");
   return {
     number,
     ...GITHUB_HANDLES.reduce(
@@ -139,7 +145,7 @@ const printResults = (pulls) => {
       ...acc,
       [handle]: finalResults.filter((row) => row[handle] !== null).length,
     }),
-    { number: null, closed_at: null, html_url: null }
+    { number: "TOTAL", closed_at: "TOTAL", html_url: "TOTAL" }
   );
 
   finalResults.push(lastRow);
@@ -163,6 +169,7 @@ const main = async () => {
           closed_at,
           html_url,
         }))
+        .sort((a, b) => a.number - b.number)
         .reduce((acc, pr) => ({ ...acc, [pr.number]: pr }), pulls);
       fs.writeFileSync(PRS_FILE, JSON.stringify(pulls, null, 2));
     } catch (e) {
@@ -180,6 +187,7 @@ const main = async () => {
       `Iterating over PR chunk number ${i + 1} out of ${pullChunks.length}`
     );
     const res = await Promise.all(chunk.map(handlePr));
+    console.log(""); // Break a line
     pulls = res.reduce(
       (acc, pr) => ({ ...acc, [pr.number]: { ...acc[pr.number], ...pr } }),
       pulls
